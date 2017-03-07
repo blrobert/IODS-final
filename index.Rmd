@@ -1,28 +1,76 @@
----
-title: "index"
-output: html_document
----
-#final
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+#Final Project-LDA on HDI
+
+###Benjamin Roberts
+###08/03/2017
+###
+
+###
+
+```{r}
+hdnew<-read.csv("create_hdnew.csv",row.names=1, na.strings=c("..","NA"))
+dim(hdnew)
+str(hdnew)
+summary(hdnew)
 ```
 
-## R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+```{r}
+library(dplyr)
+library(tidyr)
+library(MASS)
+hdnew<-filter(hdnew, complete.cases(hdnew)==TRUE)
+hdnew_scaled<-scale(hdnew)
+summary(hdnew)
+summary(hdnew_scaled)
 ```
 
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r}
+hdnew_scaled<-as.data.frame(hdnew_scaled)
+scaled_adjHDI<-hdnew_scaled$AdjustedHDI
+str(scaled_adjHDI)
+quants<-quantile(scaled_adjHDI)
+summary(quants)
+string<-c("low", "med_low", "med_high", "high")
+HDI1<-cut(scaled_adjHDI, breaks=quants, include.lowest=TRUE, label=string)
+table(HDI1)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+```{r}
+hdnew_scaled<-dplyr::select(hdnew_scaled, -AdjustedHDI)
+hdnew_scaled<-data.frame(hdnew_scaled, HDI1)
+```
+
+
+```{r}
+n<-nrow(hdnew_scaled)
+samp<-sample(n, size=n*0.8)
+train<-hdnew_scaled[samp,]
+test<-hdnew_scaled[-samp,]
+```
+
+```{r}
+lda.fit<-lda(HDI1~.,data=train)
+lda.fit
+```
+
+```{r}
+lda.arrows<-function(x, myscale=1, arrow_heads=0.1, color="red", tex=0.75, choices=c(1,2)){
+  heads<-coef(x)
+  arrows(x0=0, y0=0,
+    x1=myscale*heads[,choices[1]],
+    y1=myscale*heads[,choices[2]],
+col=color, length=arrow_heads)
+text(myscale*heads[,choices],labels=row.names(heads),
+      cex=tex,col=color, pos=3)
+}
+classes<-as.numeric(train$HDI1)
+plot(lda.fit, dimen=2, col=classes, pch=classes)
+lda.arrows(lda.fit, myscale=1)
+```
+
+```{r}
+correct_classes<-test$HDI1
+test<-dplyr::select(test,-HDI1)
+lda.pred<-predict(lda.fit, newdata=test)
+table(correct=correct_classes, predicted=lda.pred$class)
+```
