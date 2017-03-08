@@ -1,23 +1,58 @@
-#Final Project-LDA on HDI
+---
+title: Linear Discriminatory Analysis on Inequality-Adjusted HDI
+author: Benjamin Roberts
+email: benjamin.roberts@helsinki.fi
+date: 08/03/2017
+output:
+  html_document:
+    code_folding: show
+---
+<benjamin.roberts@helsinki.fi>
 
-###Benjamin Roberts
-###08/03/2017
-###
+###Abstract
+My final project uses Linear Discriminatory Analysis, a classification technique, to explore which variables strongly influence the variation between-countries in terms of inequality-adjusted Human Development Index scores. Outside of non-adjusted HDI, the variables education index (a combination of mean education and expected education) and Gross National Income Per Capita, along with the collective inequality variables, have the most influence on between-country variance in terms of inequality-adjusted HDI. My LDA model classifies the test data with small error, and thus provides an effective representation of variable influence on between-country variance in terms of adjusted HDI. 
 
-###
+###Research Question
+What are the most important factors separating countries in terms of inequality-adjusted HDI? Essentially, which variables contribute the most to the diveregences between countries in terms of their inequality-adjusted Human Development Indices? And, perhaps, which variables do the creators of the index weigh the most in developing their scores?
+
+###Hypothesis
+I believe that the Gross National Income, followed by life expectancy and educational inequality will have the greatest impact on the variation in countries' inequality-adjusted HDI scores. I belive that GNI and life expectancy will have a positive relationship with Inequality-Adjusted HDI, while educational inequality will have a negative relationship.
 
 ```{r}
-hdnew<-read.csv("create_hdnew.csv",row.names=1, na.strings=c("..","NA"))
+hdnew<-read.csv("create_hdnew.csv",row.names=1)
 dim(hdnew)
 str(hdnew)
-summary(hdnew)
 ```
 
-```{r}
+###Link to Data Wrangling Script
+https://github.com/blrobert/IODS-final/blob/master/create_hdnew.R
+
+###Data description
+hdnew is an array of 149 rows(countries) and 8 columns (variables). hdnew is a combination of the Human Development Index (hd) and Inequality-Adjusted Human Development Index datasets provided by the United Nations Development Programme. hdnew contains several key variables from the two respective datasets, but several variables were also removed to form the final dataset and remove noise. Countries with missing data were also removed from the dataset, as were regions. Row numbers (HDI rankings) were replaced with country names. The variables contained are HDI score, life_exp (life expectancy), edu_index (mean education added to expected education and divided by 2 or the average of mean education and expected education), GNI (Gross National Income Per Capita), AdjustedHDI (Inequality-Adjusted HDI), ineq_life (inequality in life expectancy), ineq_edu (inequality in education) and ineq_income (inequality in income).
+
+###Visualizing Data and Key Variables
+
+install.packages("corrplot")
+```{r, warning=FALSE}
+library(corrplot)
+library(ggplot2)
+library(GGally)
 library(dplyr)
 library(tidyr)
 library(MASS)
-hdnew<-filter(hdnew, complete.cases(hdnew)==TRUE)
+cor_matrix<-cor(hdnew)
+cor_matrix
+corrplot(cor_matrix, method="circle",type="upper", cl.pos="b", tl.pos="d", tl.cex = 0.6 )
+ggpairs(hdnew)
+```
+
+As expected, GNI has a relatively strong, positive relationship with HDI (0.852), and the exact same positive relationship with inequality-adjusted HDI. Life expectancy has an even stronger positive relationship with both measures, although it has a stronger relationship with HDI (0.896) than inequality-adjusted HDI (0.887). Educational inequality has a strong, negative relationship with HDI (-0.811) and an even stronger negative relationship with inequality-adjusted HDI (-0.863). Education index has a very strong positive relationship with both HDI and inequality-adjusted HDI (0.959 and 0.951 respectively). HDI is slightly left-skewed in its distribution. GNI and ineq_life are substantially right-skewed in their distributions, possibly due to the large amount of poor countries and relatively scarce amount of advanced developed nations.
+
+###Description of Analysis Method
+I will be using Linear Discriminant Analysis, which is a classification technique and supervised learning method. First, I provide the data with categorical labels for a certain variable--in this case inequality adjusted HDI. I will divide the countries into quartiles based on inequality-adjusted HDI, and then assign the countries to low, med_low, med_high and high classes based on which inequality-adjusted HDI quartile they belong to. Next, I divide the dataset into training data and test data, and then remove the correct classes (categorical lables for inequality-adjusted HDI) from the test data. I then fit a model to the training data, approximately determining which combination of variables seem to distinguish between the target variable classes. More specifically, the model uses the training data to estimate the mean and variance of each variable for each class. Using this model, I predict which class of inequality-adjusted HDI each country belongs to. The model uses the group means to assign a probability that a test input (country) belongs to a certain class, and attributes the input to the class with the highest assigned probability. Finally, I compare these predictions with the actual correct class data to determine the predictive power/accuracy of the model.
+
+```{r}
+
 hdnew_scaled<-scale(hdnew)
 summary(hdnew)
 summary(hdnew_scaled)
@@ -43,6 +78,7 @@ hdnew_scaled<-data.frame(hdnew_scaled, HDI1)
 
 ```{r}
 n<-nrow(hdnew_scaled)
+set.seed(1789)
 samp<-sample(n, size=n*0.8)
 train<-hdnew_scaled[samp,]
 test<-hdnew_scaled[-samp,]
@@ -65,8 +101,11 @@ text(myscale*heads[,choices],labels=row.names(heads),
 }
 classes<-as.numeric(train$HDI1)
 plot(lda.fit, dimen=2, col=classes, pch=classes)
-lda.arrows(lda.fit, myscale=1)
+lda.arrows(lda.fit, myscale=0.5)
 ```
+
+###Results
+The analysis produced 3 Linear Discriminants, one less than the total number of classes. The first LD explains over 91 percent of the between-country variance in terms of inequality-adjusted HDI, while the second LD explains over 8 percent. The high cluster varies more along LD2, the low cluster varies along both and the med_low and med_high clusters vary more along LD1. HDI and education index (mean education and expected years of education) have the most influence on LD1, while HDI, GNI and education index have the most influence on LD2. Combined, the variables inequality of income, education and life expectancy have a strong negative influence on LD1. Overall, looking at the biplot, HDI, GNI and educational index are the most influential separators for the clusters/classes. HDI appears to mostly influence the med_low and (moreso) the med_high clusters, as it has a strong negative relationship with LD2 and a strong positive relationship with LD1. GNI mostly influences the low and high clusters as it has a strong positive relationship with LD2. Education index influences the med_high and (moreso) high clusters as it has a strong positive relationship with both LD1 and LD2. There appears to be more variance within the low and high classes (as they are more influenced by both LD1 and LD2) than the med_low and med_high classes, which are more intermixed and more influenced by LD1 alone. It is possible that the data could be better explained/visualized using 3 clusters/classes. 
 
 ```{r}
 correct_classes<-test$HDI1
@@ -74,3 +113,9 @@ test<-dplyr::select(test,-HDI1)
 lda.pred<-predict(lda.fit, newdata=test)
 table(correct=correct_classes, predicted=lda.pred$class)
 ```
+
+###Model Validation
+The model correctly classified all of the high inputs in the test data. It correctly classified 6 of 8 med_low inputs, with the 2 incorrect predictions being classified as mew_high. The model correctly classified 4 out of 5 low inputs in the test data and 9 of 10 med_high inputs in the test data. Thus, the model's predictive power seems to be strong and the number of clusters/classifications seems to be effective. 
+
+###Conclusions
+I hypothesized that Gross National Income, followed by life expectancy and educational inequality, would have the greatest impact on the variation in countries' inequality-adjusted HDI scores. Aside from the obvious influence non-adjusted HDI had on between-country variance in terms of inequality-adjusted HDI, education index and GNI exerted the most influence on between-country variation in terms of inequality-adjusted HDI. Educational index, a combination of education mean and expected education, had a strong effect on both LD1, which explains over 91 percent of the between-group variation in the data, and (moreso) LD2. GNI had a strong effect on LD2, which explains over 8 percent of the between-group variation in the data. It would be interesting to look at the inequality variables together, perhaps combined in an index, because they collectively exerted a strong negative influence on LD1 although they had modest influence individually. 
